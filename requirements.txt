@@ -1,0 +1,39 @@
+# TextSense OCR — Python dependencies
+# Install with: pip install -r requirements.txt
+
+# ── Web framework ──────────────────────────────────────────────
+fastapi==0.111.1
+uvicorn[standard]==0.30.1
+python-multipart==0.0.9        # required for FastAPI file uploads
+
+# ── LLM / OpenRouter ───────────────────────────────────────────
+openai==1.35.3                 # OpenAI-compatible client (works with OpenRouter)
+python-dotenv==1.0.1           # loads .env into os.getenv()
+
+# ── OCR engines ────────────────────────────────────────────────
+paddleocr==2.7.3               # primary OCR engine (multilingual)
+paddlepaddle==2.6.1            # PaddlePaddle CPU backend for PaddleOCR
+pytesseract==0.3.10            # fallback OCR (wraps the system tesseract binary)
+
+# ── PDF handling ───────────────────────────────────────────────
+pymupdf==1.24.3                # PyMuPDF (fitz) — text-layer extraction
+pdf2image==1.17.0              # convert scanned PDF pages to PIL images
+                               # Requires system poppler-utils (see README)
+
+# ── Image processing ───────────────────────────────────────────
+opencv-python-headless==4.9.0.80   # OpenCV without GUI modules (server-safe)
+Pillow==10.3.0                     # PIL — image I/O and helpers
+
+# ── NLP / Sentiment ────────────────────────────────────────────
+transformers==4.41.2           # HuggingFace pipelines
+torch==2.3.0                   # PyTorch CPU (sentiment model backend)
+                               # For GPU support replace with torch+cu121 wheel
+sentencepiece==0.2.0           # tokeniser dependency for XLM-RoBERTa
+
+# ── Sentence splitting ─────────────────────────────────────────
+spacy==3.7.4                   # primary sentence splitter (sentencizer)
+                               # After install: python -m spacy download xx_ent_wiki_sm
+nltk==3.8.1                    # fallback sentence splitter
+
+# ── Utilities ──────────────────────────────────────────────────
+numpy==1.26.4                  # numerical arrays (shared dep)

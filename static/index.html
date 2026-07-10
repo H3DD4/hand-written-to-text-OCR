@@ -1,0 +1,1687 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TextSense OCR — Extract & Analyse Document Sentiment </title>
+  <meta name="description"
+    content="Upload images or PDFs to extract text via OCR and automatically classify sentences as positive, negative, or neutral using AI sentiment analysis." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet" />
+  <style>
+    /* =====================================================================
+       Design Tokens — inspired by Talan Group's "Positive Innovation"
+       brand palette: Biscay navy, Wasabi green, Persian pink.
+    ===================================================================== */
+    :root {
+      --bg: #f4f5f9;
+      --bg-deep: #eef0f7;
+      --surface: #ffffff;
+      --surface-2: #f7f8fc;
+      --surface-3: #eceff8;
+      --border: #dde1ee;
+      --border-glow: #c3cbe8;
+
+      /* Talan brand core */
+      --navy: #10204a;
+      --navy-soft: #1a2f6b;
+      --wasabi: #8f9424;
+      --wasabi-bright: #b5bd2c;
+      --pink: #f387d2;
+      --pink-soft: #fbd4ec;
+
+      --accent: #1a2f6b;
+      --accent-dim: #0d1a3e;
+      --accent-glow: rgba(26, 47, 107, 0.12);
+
+      --positive: #6b7a1f;
+      --positive-bg: rgba(143, 148, 36, 0.09);
+      --positive-border: rgba(143, 148, 36, 0.3);
+
+      --negative: #c2367a;
+      --negative-bg: rgba(243, 135, 210, 0.12);
+      --negative-border: rgba(243, 135, 210, 0.45);
+
+      --neutral: #6b7590;
+      --neutral-bg: rgba(26, 47, 107, 0.05);
+      --neutral-border: rgba(26, 47, 107, 0.14);
+
+      --text-primary: #101730;
+      --text-secondary: #545e7d;
+      --text-muted: #949cb8;
+
+      --radius-sm: 6px;
+      --radius-md: 12px;
+      --radius-lg: 18px;
+      --radius-xl: 26px;
+
+      --shadow-sm: 0 1px 3px rgba(16, 32, 74, .06);
+      --shadow-md: 0 8px 24px rgba(16, 32, 74, .08);
+      --shadow-lg: 0 16px 48px rgba(16, 32, 74, .12);
+      --shadow-glow: 0 0 0 4px rgba(26, 47, 107, .06), 0 20px 50px rgba(26, 47, 107, .14);
+
+      --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* =====================================================================
+       Reset & Base
+    ===================================================================== */
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Talan-style diagonal ribbon backdrop instead of a plain tech grid */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(circle at 12% -6%, rgba(243, 135, 210, .16) 0%, transparent 38%),
+        radial-gradient(circle at 108% 10%, rgba(143, 148, 36, .14) 0%, transparent 42%),
+        linear-gradient(180deg, var(--bg-deep) 0%, var(--bg) 340px);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    body::after {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 6px;
+      background: linear-gradient(90deg, var(--navy) 0%, var(--navy-soft) 30%, var(--pink) 65%, var(--wasabi) 100%);
+      z-index: 2;
+    }
+
+    /* =====================================================================
+       Layout
+    ===================================================================== */
+    .app-wrapper {
+      position: relative;
+      z-index: 1;
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 0 20px 80px;
+    }
+
+    /* =====================================================================
+       Header
+    ===================================================================== */
+    header {
+      text-align: center;
+      padding: 64px 0 40px;
+    }
+
+    .brand-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 28px;
+    }
+
+    .brand-mark {
+      width: 34px;
+      height: 34px;
+      border-radius: 9px;
+      background: linear-gradient(135deg, var(--navy) 0%, var(--navy-soft) 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 15px;
+      box-shadow: var(--shadow-sm);
+      position: relative;
+    }
+
+    .brand-mark::after {
+      content: '';
+      position: absolute;
+      bottom: -3px;
+      right: -3px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--pink);
+      border: 2px solid var(--bg);
+    }
+
+    .brand-name {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 600;
+      font-size: 15px;
+      letter-spacing: .02em;
+      color: var(--navy);
+    }
+
+    .brand-divider {
+      width: 1px;
+      height: 16px;
+      background: var(--border-glow);
+    }
+
+    .logo-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 6px 16px 6px 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .logo-badge .dot {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--wasabi) 0%, var(--wasabi-bright) 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: pulse 2.4s infinite;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        box-shadow: 0 0 0 0 rgba(143, 148, 36, .35);
+      }
+
+      50% {
+        box-shadow: 0 0 0 6px rgba(143, 148, 36, 0);
+      }
+    }
+
+    h1 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(2.1rem, 5vw, 3.4rem);
+      font-weight: 700;
+      letter-spacing: -.02em;
+      line-height: 1.08;
+      color: var(--navy);
+      margin-bottom: 18px;
+    }
+
+    h1 .accent-word {
+      position: relative;
+      display: inline-block;
+      color: var(--navy);
+    }
+
+    h1 .accent-word::after {
+      content: '';
+      position: absolute;
+      left: -2%;
+      right: -2%;
+      bottom: 4px;
+      height: .3em;
+      background: linear-gradient(90deg, var(--pink) 0%, var(--wasabi) 100%);
+      opacity: .35;
+      z-index: -1;
+      border-radius: 3px;
+    }
+
+    .tagline {
+      color: var(--text-secondary);
+      font-size: 1.05rem;
+      font-weight: 400;
+      max-width: 540px;
+      margin: 0 auto 28px;
+      line-height: 1.6;
+    }
+
+    .tagline strong {
+      color: var(--navy-soft);
+    }
+
+    .lang-chips {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .chip {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 5px 13px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      font-weight: 500;
+      box-shadow: var(--shadow-sm);
+    }
+
+    /* =====================================================================
+       Upload Zone
+    ===================================================================== */
+    .upload-card {
+      background: var(--surface);
+      border: 2px dashed var(--border-glow);
+      border-radius: var(--radius-xl);
+      padding: 56px 32px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color var(--transition), background var(--transition), box-shadow var(--transition), transform var(--transition);
+      position: relative;
+      overflow: hidden;
+      box-shadow: var(--shadow-md);
+    }
+
+    .upload-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse at 15% 0%, rgba(243, 135, 210, .12) 0%, transparent 55%),
+        radial-gradient(ellipse at 85% 100%, rgba(143, 148, 36, .12) 0%, transparent 55%);
+      opacity: 0;
+      transition: opacity var(--transition);
+    }
+
+    .upload-card:hover,
+    .upload-card.dragover {
+      border-color: var(--navy-soft);
+      background: var(--surface-2);
+      box-shadow: var(--shadow-glow);
+      transform: translateY(-2px);
+    }
+
+    .upload-card:hover::before,
+    .upload-card.dragover::before {
+      opacity: 1;
+    }
+
+    .upload-icon {
+      width: 64px;
+      height: 64px;
+      background: linear-gradient(135deg, var(--navy) 0%, var(--navy-soft) 100%);
+      border-radius: var(--radius-lg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
+      font-size: 26px;
+      transition: transform var(--transition);
+      box-shadow: var(--shadow-md);
+      position: relative;
+      z-index: 1;
+    }
+
+    .upload-card:hover .upload-icon {
+      transform: translateY(-3px) rotate(-4deg);
+    }
+
+    .upload-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.2rem;
+      font-weight: 600;
+      color: var(--navy);
+      margin-bottom: 8px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .upload-subtitle {
+      font-size: .875rem;
+      color: var(--text-secondary);
+      margin-bottom: 24px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .upload-subtitle span {
+      color: var(--pink);
+      font-weight: 600;
+      border-bottom: 1px solid var(--pink);
+    }
+
+    .file-types {
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      position: relative;
+      z-index: 1;
+    }
+
+    .file-type-badge {
+      background: var(--surface-3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 3px 10px;
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--navy-soft);
+      font-weight: 500;
+    }
+
+    #file-input {
+      display: none;
+    }
+
+    /* Selected files gallery */
+    .file-selection-panel {
+      display: none;
+      margin-top: 18px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 14px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .file-selection-panel.visible {
+      display: block;
+    }
+
+    .file-selection-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .file-selection-meta {
+      font-size: .82rem;
+      color: var(--text-secondary);
+      font-weight: 600;
+    }
+
+    .file-clear-all-btn {
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--navy-soft);
+      border-radius: var(--radius-sm);
+      padding: 6px 10px;
+      font-size: .78rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+
+    .file-clear-all-btn:hover {
+      border-color: var(--negative-border);
+      color: var(--negative);
+      background: var(--negative-bg);
+    }
+
+    .file-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 10px;
+    }
+
+    .file-card {
+      position: relative;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+    }
+
+    .file-thumb {
+      height: 95px;
+      background: var(--surface-3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      font-size: 28px;
+      color: var(--navy-soft);
+    }
+
+    .file-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .file-card-body {
+      padding: 8px 9px 10px;
+    }
+
+    .file-card-name {
+      font-size: .75rem;
+      font-weight: 600;
+      color: var(--navy);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 3px;
+    }
+
+    .file-card-size {
+      font-size: .7rem;
+      color: var(--text-muted);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .file-card-remove {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      width: 24px;
+      height: 24px;
+      border: none;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, .9);
+      color: var(--negative);
+      font-size: 15px;
+      line-height: 1;
+      cursor: pointer;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .file-card-remove:hover {
+      background: var(--negative);
+      color: #fff;
+    }
+
+    /* =====================================================================
+       Analyze Button
+    ===================================================================== */
+    .analyze-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      margin-top: 16px;
+      padding: 17px 32px;
+      background: linear-gradient(120deg, var(--navy) 0%, var(--navy-soft) 55%, #2c3f82 100%);
+      color: #fff;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1rem;
+      font-weight: 600;
+      border: none;
+      border-radius: var(--radius-lg);
+      cursor: pointer;
+      transition: opacity var(--transition), transform var(--transition), box-shadow var(--transition);
+      box-shadow: 0 10px 30px rgba(16, 32, 74, .25);
+      letter-spacing: .01em;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .analyze-btn::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -60%;
+      width: 40%;
+      height: 100%;
+      background: linear-gradient(120deg, transparent, rgba(255, 255, 255, .25), transparent);
+      transform: skewX(-20deg);
+      transition: left .6s ease;
+    }
+
+    .analyze-btn:hover:not(:disabled)::after {
+      left: 130%;
+    }
+
+    .analyze-btn:hover:not(:disabled) {
+      opacity: .96;
+      transform: translateY(-2px);
+      box-shadow: 0 14px 36px rgba(16, 32, 74, .32);
+    }
+
+    .analyze-btn:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    .analyze-btn:disabled {
+      opacity: .4;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* =====================================================================
+       Loader
+    ===================================================================== */
+    .loader-section {
+      display: none;
+      text-align: center;
+      padding: 48px 0;
+    }
+
+    .loader-section.visible {
+      display: block;
+    }
+
+    .spinner {
+      width: 56px;
+      height: 56px;
+      border: 3px solid var(--border);
+      border-top-color: var(--navy-soft);
+      border-right-color: var(--pink);
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+      margin: 0 auto 20px;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .loader-text {
+      font-size: .95rem;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    .loader-steps {
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+      margin-top: 16px;
+      flex-wrap: wrap;
+    }
+
+    .step-pill {
+      font-size: .75rem;
+      padding: 4px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      transition: all var(--transition);
+      background: var(--surface);
+    }
+
+    .step-pill.active {
+      border-color: var(--navy-soft);
+      color: var(--navy-soft);
+      background: var(--accent-glow);
+    }
+
+    .step-pill.done {
+      border-color: var(--positive-border);
+      color: var(--positive);
+      background: var(--positive-bg);
+    }
+
+    /* =====================================================================
+       Results Section
+    ===================================================================== */
+    .results-section {
+      display: none;
+      margin-top: 40px;
+    }
+
+    .results-section.visible {
+      display: block;
+    }
+
+    .results-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .results-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--navy);
+    }
+
+    .results-meta {
+      display: flex;
+      gap: 10px;
+    }
+
+    .meta-badge {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: .8rem;
+      font-weight: 600;
+      padding: 4px 12px;
+      border-radius: 999px;
+      border: 1px solid;
+    }
+
+    .meta-badge.pos {
+      color: var(--positive);
+      background: var(--positive-bg);
+      border-color: var(--positive-border);
+    }
+
+    .meta-badge.neg {
+      color: var(--negative);
+      background: var(--negative-bg);
+      border-color: var(--negative-border);
+    }
+
+    .meta-badge.neu {
+      color: var(--neutral);
+      background: var(--neutral-bg);
+      border-color: var(--neutral-border);
+    }
+
+    /* Sentiment columns */
+    .sentiment-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    @media (max-width: 620px) {
+      .sentiment-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .sentiment-col {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .col-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      font-size: .875rem;
+      font-weight: 700;
+      font-family: 'Space Grotesk', sans-serif;
+    }
+
+    .col-header .col-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .col-header .col-count {
+      margin-left: auto;
+      font-size: .75rem;
+      font-weight: 500;
+      padding: 2px 8px;
+      border-radius: 999px;
+    }
+
+    .positive-col .col-header {
+      background: var(--positive-bg);
+      border-bottom-color: var(--positive-border);
+      color: var(--positive);
+    }
+
+    .positive-col .col-header .col-dot {
+      background: var(--wasabi);
+    }
+
+    .positive-col .col-header .col-count {
+      background: var(--surface);
+      border: 1px solid var(--positive-border);
+      color: var(--positive);
+    }
+
+    .negative-col .col-header {
+      background: var(--negative-bg);
+      border-bottom-color: var(--negative-border);
+      color: var(--negative);
+    }
+
+    .negative-col .col-header .col-dot {
+      background: var(--pink);
+    }
+
+    .negative-col .col-header .col-count {
+      background: var(--surface);
+      border: 1px solid var(--negative-border);
+      color: var(--negative);
+    }
+
+    .col-body {
+      padding: 12px;
+    }
+
+    .sentence-item {
+      padding: 10px 14px;
+      border-radius: var(--radius-md);
+      font-size: .875rem;
+      line-height: 1.6;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+      border: 1px solid transparent;
+      transition: border-color var(--transition), background var(--transition), transform var(--transition);
+    }
+
+    .sentence-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .positive-col .sentence-item {
+      background: var(--positive-bg);
+      border-color: var(--positive-border);
+      border-left: 3px solid var(--wasabi);
+    }
+
+    .positive-col .sentence-item:hover {
+      border-color: var(--wasabi);
+      transform: translateX(2px);
+    }
+
+    .negative-col .sentence-item {
+      background: var(--negative-bg);
+      border-color: var(--negative-border);
+      border-left: 3px solid var(--pink);
+    }
+
+    .negative-col .sentence-item:hover {
+      border-color: var(--pink);
+      transform: translateX(2px);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 32px 16px;
+      color: var(--text-muted);
+      font-size: .875rem;
+    }
+
+    /* Neutral row (full width, collapsible) */
+    .neutral-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      margin-bottom: 16px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .neutral-toggle {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 20px;
+      cursor: pointer;
+      font-size: .875rem;
+      font-weight: 600;
+      color: var(--neutral);
+      background: var(--neutral-bg);
+      border: none;
+      width: 100%;
+      text-align: left;
+      border-bottom: 1px solid transparent;
+      transition: background var(--transition);
+      font-family: 'Space Grotesk', sans-serif;
+    }
+
+    .neutral-toggle:hover {
+      background: rgba(26, 47, 107, .08);
+    }
+
+    .neutral-toggle .arrow {
+      margin-left: auto;
+      transition: transform var(--transition);
+    }
+
+    .neutral-toggle.open .arrow {
+      transform: rotate(180deg);
+    }
+
+    .neutral-toggle.open {
+      border-bottom-color: var(--neutral-border);
+    }
+
+    .neutral-body {
+      display: none;
+      padding: 12px;
+    }
+
+    .neutral-body.open {
+      display: block;
+    }
+
+    .neutral-body .sentence-item {
+      background: var(--neutral-bg);
+      border-color: var(--neutral-border);
+      border-left: 3px solid var(--navy-soft);
+    }
+
+    .neutral-body .sentence-item:hover {
+      border-color: var(--navy-soft);
+    }
+
+    /* =====================================================================
+       Raw Text Collapsible
+    ===================================================================== */
+    .raw-text-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .raw-toggle {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 20px;
+      cursor: pointer;
+      font-size: .875rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      background: none;
+      border: none;
+      width: 100%;
+      text-align: left;
+      transition: color var(--transition);
+    }
+
+    .raw-toggle:hover {
+      color: var(--navy);
+    }
+
+    .raw-toggle .arrow {
+      margin-left: auto;
+      transition: transform var(--transition);
+    }
+
+    .raw-toggle.open {
+      color: var(--navy);
+    }
+
+    .raw-toggle.open .arrow {
+      transform: rotate(180deg);
+    }
+
+    .raw-body {
+      display: none;
+      border-top: 1px solid var(--border);
+    }
+
+    .raw-body.open {
+      display: block;
+    }
+
+    .raw-text-content {
+      padding: 20px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .8rem;
+      line-height: 1.7;
+      color: var(--text-secondary);
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 360px;
+      overflow-y: auto;
+      background: var(--surface-2);
+    }
+
+    /* Scrollbar styling */
+    .raw-text-content::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .raw-text-content::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .raw-text-content::-webkit-scrollbar-thumb {
+      background: var(--border-glow);
+      border-radius: 3px;
+    }
+
+    /* =====================================================================
+       Error Banner
+    ===================================================================== */
+    .error-banner {
+      display: none;
+      align-items: flex-start;
+      gap: 12px;
+      background: var(--negative-bg);
+      border: 1px solid var(--negative-border);
+      border-radius: var(--radius-md);
+      padding: 14px 18px;
+      margin-top: 16px;
+    }
+
+    .error-banner.visible {
+      display: flex;
+    }
+
+    .error-icon {
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .error-text {
+      font-size: .875rem;
+      color: #a3255f;
+      line-height: 1.5;
+    }
+
+    /* =====================================================================
+       Reset / Analyze again
+    ===================================================================== */
+    .reset-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--navy-soft);
+      font-family: 'Inter', sans-serif;
+      font-size: .875rem;
+      font-weight: 600;
+      padding: 8px 16px;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: all var(--transition);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .reset-btn:hover {
+      border-color: var(--navy-soft);
+      background: var(--surface-2);
+    }
+
+    /* =====================================================================
+       Footer
+    ===================================================================== */
+    footer {
+      text-align: center;
+      padding-top: 48px;
+      font-size: .75rem;
+      color: var(--text-muted);
+    }
+
+    footer .footer-tagline {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 600;
+      color: var(--navy-soft);
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      font-size: .7rem;
+      margin-bottom: 6px;
+    }
+
+    footer a {
+      color: var(--text-muted);
+      text-decoration: none;
+    }
+
+    footer a:hover {
+      color: var(--pink);
+    }
+
+    /* =====================================================================
+       Utility Animations
+    ===================================================================== */
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(16px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .animate-in {
+      animation: fadeInUp .35s ease forwards;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="app-wrapper">
+
+    <!-- ─── Header ─── -->
+    <header>
+      <div class="brand-row">
+        <div class="brand-mark">T</div>
+        <span class="brand-name">PTT</span>
+        <span class="brand-divider"></span>
+        <div class="logo-badge">
+          <span class="dot"></span>
+          TextSense OCR
+        </div>
+      </div>
+      <h1>Extract &amp; Analyse<br /><span class="accent-word">Document Points</span></h1>
+      <p class="tagline">
+        Upload any image or PDF — OCR extracts the text, then an
+        <strong>LLM</strong> identifies every positive and negative point in the document.
+      </p>
+      <div class="lang-chips">
+        <span class="chip">🇬🇧 English</span>
+        <span class="chip">🇫🇷 French</span>
+        <span class="chip">🇸🇦 Arabic</span>
+        <span class="chip">📄 PDF text layer</span>
+        <span class="chip">🖼️ Scanned images</span>
+      </div>
+    </header>
+
+    <!-- ─── Upload Zone ─── -->
+    <section id="upload-section" aria-label="File upload">
+      <div class="upload-card" id="drop-zone" role="button" tabindex="0" aria-label="Click or drag a file to upload">
+        <div class="upload-icon">📄</div>
+        <p class="upload-title">Drop your file here</p>
+        <p class="upload-subtitle">or <span>click to browse</span> from your device</p>
+        <div class="file-types">
+          <span class="file-type-badge">.jpg</span>
+          <span class="file-type-badge">.png</span>
+          <span class="file-type-badge">.pdf</span>
+          <span class="file-type-badge">.bmp</span>
+          <span class="file-type-badge">.tiff</span>
+          <span class="file-type-badge">.webp</span>
+        </div>
+        <input type="file" id="file-input" accept=".jpg,.jpeg,.png,.pdf,.bmp,.tiff,.tif,.webp" multiple
+          aria-label="File picker" />
+      </div>
+
+      <div class="file-selection-panel" id="file-selection-panel" role="status">
+        <div class="file-selection-toolbar">
+          <div class="file-selection-meta" id="file-selection-meta">0 files selected</div>
+          <button class="file-clear-all-btn" id="file-clear-all-btn" type="button">Clear all</button>
+        </div>
+        <div class="file-grid" id="file-grid"></div>
+      </div>
+
+      <!-- Error banner -->
+      <div class="error-banner" id="error-banner" role="alert">
+        <span class="error-icon">⚠️</span>
+        <div class="error-text" id="error-text">An error occurred.</div>
+      </div>
+
+      <!-- Analyze button -->
+      <button class="analyze-btn" id="analyze-btn" disabled aria-label="Start analysis">
+        <span>✦</span>
+        Analyse Document
+      </button>
+    </section>
+
+    <!-- ─── Loader ─── -->
+    <section class="loader-section" id="loader-section" aria-live="polite" aria-label="Processing">
+      <div class="spinner"></div>
+      <p class="loader-text" id="loader-text">Preprocessing image…</p>
+      <div class="loader-steps">
+        <span class="step-pill" id="step-ocr">OCR Extraction</span>
+        <span class="step-pill" id="step-clean">Text Cleaning</span>
+        <span class="step-pill" id="step-sentiment">LLM Analysis</span>
+      </div>
+    </section>
+
+    <!-- ─── Results ─── -->
+    <section class="results-section" id="results-section" aria-label="Analysis results">
+
+      <div class="results-header">
+        <h2 class="results-title">Analysis Results</h2>
+        <div class="results-meta">
+          <span class="meta-badge pos" id="badge-pos">● 0 positive</span>
+          <span class="meta-badge neg" id="badge-neg">● 0 negative</span>
+        </div>
+        <button class="reset-btn" id="reset-btn" aria-label="Analyse another file">
+          ↩ Analyse another
+        </button>
+      </div>
+      <!-- Model used indicator -->
+      <div id="model-used-bar" style="
+        display:none;
+        align-items:center;
+        gap:8px;
+        margin-bottom:20px;
+        font-size:.78rem;
+        color:var(--text-muted);
+      ">
+        <span style="font-size:14px">🤖</span>
+        Analysed by&nbsp;<strong id="model-used-name" style="color:var(--navy-soft)"></strong>
+      </div>
+
+      <div class="raw-text-section" id="global-summary-section" style="margin-bottom:16px; display:none;">
+        <button class="raw-toggle open" style="cursor:default;" aria-expanded="true">
+          <span>🧾</span>
+          Combined Summary
+        </button>
+        <div class="raw-body open" style="display:block;">
+          <pre class="raw-text-content" id="global-summary-content" style="max-height:none;"></pre>
+        </div>
+      </div>
+
+      <div class="raw-text-section" id="files-breakdown-section" style="margin-bottom:16px; display:none;">
+        <button class="raw-toggle" id="files-breakdown-toggle" aria-expanded="false" aria-controls="files-breakdown-body">
+          <span>🗂️</span>
+          Per-File Breakdown
+          <span class="arrow">▾</span>
+        </button>
+        <div class="raw-body" id="files-breakdown-body" role="region"></div>
+      </div>
+
+      <!-- Positive / Negative columns -->
+      <div class="sentiment-grid">
+        <!-- Positive -->
+        <div class="sentiment-col positive-col" id="positive-col">
+          <div class="col-header">
+            <span class="col-dot"></span>
+            ✅ Positive Points
+            <span class="col-count" id="pos-count">0</span>
+          </div>
+          <div class="col-body" id="pos-body">
+            <div class="empty-state">No positive points detected.</div>
+          </div>
+        </div>
+        <!-- Negative -->
+        <div class="sentiment-col negative-col" id="negative-col">
+          <div class="col-header">
+            <span class="col-dot"></span>
+            ❌ Negative Points
+            <span class="col-count" id="neg-count">0</span>
+          </div>
+          <div class="col-body" id="neg-body">
+            <div class="empty-state">No negative points detected.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Neutral (collapsible) -->
+      <div class="neutral-section" id="neutral-section">
+        <button class="neutral-toggle" id="neutral-toggle" aria-expanded="false" aria-controls="neutral-body">
+          <span>●</span>
+          Neutral Sentences
+          <span class="col-count neu" id="neu-count" style="margin-left:8px">0</span>
+          <span class="arrow">▾</span>
+        </button>
+        <div class="neutral-body" id="neutral-body" role="region">
+          <div class="empty-state">No neutral sentences.</div>
+        </div>
+      </div>
+
+      <!-- Raw text (collapsible) -->
+      <div class="raw-text-section">
+        <button class="raw-toggle" id="raw-toggle" aria-expanded="false" aria-controls="raw-body">
+          <span>📋</span>
+          Raw Extracted Text
+          <span class="arrow">▾</span>
+        </button>
+        <div class="raw-body" id="raw-body" role="region">
+          <pre class="raw-text-content" id="raw-text-content"></pre>
+        </div>
+      </div>
+
+    </section>
+
+  </div><!-- /app-wrapper -->
+
+  <footer>
+    <p class="footer-tagline">Positive Innovation</p>
+    <p>TextSense OCR &mdash; OCR by PaddleOCR &middot; LLM analysis via <a href="https://openrouter.ai" target="_blank"
+        rel="noopener">OpenRouter</a></p>
+  </footer>
+
+  <script>
+    /* =====================================================================
+       State
+    ===================================================================== */
+    let selectedFiles = [];
+    const previewUrls = new Map();
+
+    /* =====================================================================
+       Element refs
+    ===================================================================== */
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const fileSelectionPanel = document.getElementById('file-selection-panel');
+    const fileSelectionMeta = document.getElementById('file-selection-meta');
+    const fileGrid = document.getElementById('file-grid');
+    const fileClearAllBtn = document.getElementById('file-clear-all-btn');
+    const analyzeBtn = document.getElementById('analyze-btn');
+    const errorBanner = document.getElementById('error-banner');
+    const errorText = document.getElementById('error-text');
+
+    const loaderSection = document.getElementById('loader-section');
+    const loaderText = document.getElementById('loader-text');
+    const stepOcr = document.getElementById('step-ocr');
+    const stepClean = document.getElementById('step-clean');
+    const stepSentiment = document.getElementById('step-sentiment');
+
+    const resultsSection = document.getElementById('results-section');
+    const badgePos = document.getElementById('badge-pos');
+    const badgeNeg = document.getElementById('badge-neg');
+    const posCount = document.getElementById('pos-count');
+    const negCount = document.getElementById('neg-count');
+    const neuCount = document.getElementById('neu-count');
+    const posBody = document.getElementById('pos-body');
+    const negBody = document.getElementById('neg-body');
+    const neutralToggle = document.getElementById('neutral-toggle');
+    const neutralBody = document.getElementById('neutral-body');
+    const rawToggle = document.getElementById('raw-toggle');
+    const rawBody = document.getElementById('raw-body');
+    const rawTextContent = document.getElementById('raw-text-content');
+    const resetBtn = document.getElementById('reset-btn');
+    const globalSummarySection = document.getElementById('global-summary-section');
+    const globalSummaryContent = document.getElementById('global-summary-content');
+    const filesBreakdownSection = document.getElementById('files-breakdown-section');
+    const filesBreakdownToggle = document.getElementById('files-breakdown-toggle');
+    const filesBreakdownBody = document.getElementById('files-breakdown-body');
+
+    /* =====================================================================
+       Drag & Drop
+    ===================================================================== */
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
+    });
+
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('dragover');
+    });
+
+    ['dragleave', 'dragend'].forEach(evt =>
+      dropZone.addEventListener(evt, () => dropZone.classList.remove('dragover'))
+    );
+
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      if (e.dataTransfer.files.length) addFiles(Array.from(e.dataTransfer.files));
+    });
+
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files.length) {
+        addFiles(Array.from(fileInput.files));
+        // Clear native input so selecting the same file again still triggers change.
+        fileInput.value = '';
+      }
+    });
+
+    /* =====================================================================
+       File helpers
+    ===================================================================== */
+    function formatSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+    }
+
+    function fileEmoji(name) {
+      const ext = name.split('.').pop().toLowerCase();
+      if (ext === 'pdf') return '📋';
+      if (['jpg', 'jpeg', 'png', 'bmp', 'tiff', 'tif', 'webp'].includes(ext)) return '🖼️';
+      return '📄';
+    }
+
+    function fileKey(file) {
+      return `${file.name}::${file.size}::${file.lastModified}`;
+    }
+
+    function isImage(file) {
+      const ext = file.name.split('.').pop().toLowerCase();
+      return ['jpg', 'jpeg', 'png', 'bmp', 'tiff', 'tif', 'webp'].includes(ext);
+    }
+
+    function getPreviewUrl(file) {
+      const key = fileKey(file);
+      if (!previewUrls.has(key)) {
+        previewUrls.set(key, URL.createObjectURL(file));
+      }
+      return previewUrls.get(key);
+    }
+
+    function revokeRemovedPreviewUrls() {
+      const activeKeys = new Set(selectedFiles.map(fileKey));
+      for (const [key, url] of previewUrls.entries()) {
+        if (!activeKeys.has(key)) {
+          URL.revokeObjectURL(url);
+          previewUrls.delete(key);
+        }
+      }
+    }
+
+    function renderSelectedFiles() {
+      revokeRemovedPreviewUrls();
+
+      if (!selectedFiles.length) {
+        fileSelectionPanel.classList.remove('visible');
+        fileGrid.innerHTML = '';
+        return;
+      }
+
+      const totalBytes = selectedFiles.reduce((acc, f) => acc + f.size, 0);
+      fileSelectionMeta.textContent = `${selectedFiles.length} file(s) selected · ${formatSize(totalBytes)}`;
+
+      fileGrid.innerHTML = selectedFiles.map((file) => {
+        const key = encodeURIComponent(fileKey(file));
+        const thumb = isImage(file)
+          ? `<img src="${getPreviewUrl(file)}" alt="${escapeHtml(file.name)} preview" />`
+          : `<span>${fileEmoji(file.name)}</span>`;
+        return `
+          <article class="file-card">
+            <button class="file-card-remove" type="button" data-file-key="${key}" aria-label="Remove ${escapeHtml(file.name)}">✕</button>
+            <div class="file-thumb">${thumb}</div>
+            <div class="file-card-body">
+              <div class="file-card-name">${escapeHtml(file.name)}</div>
+              <div class="file-card-size">${formatSize(file.size)}</div>
+            </div>
+          </article>
+        `;
+      }).join('');
+
+      fileSelectionPanel.classList.add('visible');
+    }
+
+    function mergeFiles(existing, incoming) {
+      const map = new Map();
+      [...existing, ...incoming].forEach((f) => {
+        const key = fileKey(f);
+        if (!map.has(key)) map.set(key, f);
+      });
+      return Array.from(map.values());
+    }
+
+    function addFiles(files) {
+      selectedFiles = mergeFiles(selectedFiles, files);
+      hideError();
+      renderSelectedFiles();
+      analyzeBtn.disabled = false;
+    }
+
+    function clearFiles() {
+      for (const url of previewUrls.values()) {
+        URL.revokeObjectURL(url);
+      }
+      previewUrls.clear();
+      selectedFiles = [];
+      fileInput.value = '';
+      renderSelectedFiles();
+      analyzeBtn.disabled = true;
+    }
+
+    fileClearAllBtn.addEventListener('click', () => {
+      clearFiles();
+      hideError();
+    });
+
+    fileGrid.addEventListener('click', (e) => {
+      const btn = e.target.closest('.file-card-remove');
+      if (!btn) return;
+      const targetKey = decodeURIComponent(btn.getAttribute('data-file-key') || '');
+      selectedFiles = selectedFiles.filter((f) => fileKey(f) !== targetKey);
+      renderSelectedFiles();
+      analyzeBtn.disabled = selectedFiles.length === 0;
+    });
+
+    /* =====================================================================
+       Error helpers
+    ===================================================================== */
+    function showError(msg) {
+      errorText.textContent = msg;
+      errorBanner.classList.add('visible');
+    }
+
+    function hideError() {
+      errorBanner.classList.remove('visible');
+    }
+
+    /* =====================================================================
+       Loader animation
+    ===================================================================== */
+    let _stepTimer = null;
+
+    function startLoader() {
+      loaderSection.classList.add('visible');
+      resultsSection.classList.remove('visible');
+      [stepOcr, stepClean, stepSentiment].forEach(s => s.className = 'step-pill');
+
+      // Animate steps sequentially to give visual feedback
+      const steps = [
+        { el: stepOcr, label: 'Running OCR on your document…', delay: 0 },
+        { el: stepClean, label: 'Cleaning and structuring extracted text…', delay: 3000 },
+        { el: stepSentiment, label: 'LLM extracting positive & negative points…', delay: 6000 },
+      ];
+
+      steps.forEach(({ el, label, delay }) => {
+        setTimeout(() => {
+          // Mark previous as done
+          const idx = steps.findIndex(s => s.el === el);
+          if (idx > 0) steps[idx - 1].el.className = 'step-pill done';
+          el.className = 'step-pill active';
+          loaderText.textContent = label;
+        }, delay);
+      });
+    }
+
+    function stopLoader() {
+      loaderSection.classList.remove('visible');
+      [stepOcr, stepClean, stepSentiment].forEach(s => s.className = 'step-pill');
+      clearTimeout(_stepTimer);
+    }
+
+    /* =====================================================================
+       Render results
+    ===================================================================== */
+    function renderSentences(container, sentences) {
+      if (!sentences || sentences.length === 0) {
+        container.innerHTML = '<div class="empty-state">None detected.</div>';
+        return;
+      }
+      container.innerHTML = sentences
+        .map(s => `<div class="sentence-item">${escapeHtml(s)}</div>`)
+        .join('');
+    }
+
+    function escapeHtml(text) {
+      return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function showResults(data) {
+      const posLen = (data.positive || []).length;
+      const negLen = (data.negative || []).length;
+      const neuLen = (data.neutral || []).length;
+
+      // Summary badges
+      badgePos.textContent = `● ${posLen} positive`;
+      badgeNeg.textContent = `● ${negLen} negative`;
+      posCount.textContent = posLen;
+      negCount.textContent = negLen;
+
+      // Model-used bar
+      const modelBar = document.getElementById('model-used-bar');
+      const modelName = document.getElementById('model-used-name');
+      if (data.model) {
+        modelName.textContent = data.model;
+        modelBar.style.display = 'flex';
+      } else {
+        modelBar.style.display = 'none';
+      }
+
+      // Points lists
+      renderSentences(posBody, data.positive);
+      renderSentences(negBody, data.negative);
+
+      // Neutral (may be empty with LLM mode, still show collapsible)
+      const neuCount = document.getElementById('neu-count');
+      if (neuCount) neuCount.textContent = neuLen;
+      renderSentences(neutralBody, data.neutral);
+
+      // Raw text
+      rawTextContent.textContent = data.raw_text || '(empty)';
+
+      // Combined summary for batch mode
+      if (data.summary) {
+        globalSummaryContent.textContent = data.summary;
+        globalSummarySection.style.display = 'block';
+      } else {
+        globalSummarySection.style.display = 'none';
+      }
+
+      // Per-file breakdown for batch mode
+      if (Array.isArray(data.files) && data.files.length > 0) {
+        filesBreakdownBody.innerHTML = data.files.map((f) => {
+          const p = (f.positive || []).length;
+          const n = (f.negative || []).length;
+          return `
+            <div class="sentence-item" style="margin:12px; background:var(--surface-2); border-color:var(--border);">
+              <div style="font-weight:700; color:var(--navy); margin-bottom:8px;">${escapeHtml(f.filename || 'file')}</div>
+              <div style="font-size:.8rem; color:var(--text-secondary); margin-bottom:8px;">+${p} positive · -${n} negative</div>
+              <div style="font-size:.82rem; color:var(--text-primary); line-height:1.5;">${escapeHtml((f.raw_text || '').slice(0, 320) || '(no extracted text)')}</div>
+            </div>
+          `;
+        }).join('');
+
+        if (Array.isArray(data.errors) && data.errors.length > 0) {
+          filesBreakdownBody.innerHTML += data.errors.map((e) => `
+            <div class="sentence-item" style="margin:12px; background:var(--negative-bg); border-color:var(--negative-border);">
+              <div style="font-weight:700; color:var(--negative); margin-bottom:6px;">Failed: ${escapeHtml(e.filename || 'file')}</div>
+              <div style="font-size:.82rem; color:#7d214f;">${escapeHtml(e.detail || 'Unknown error')}</div>
+            </div>
+          `).join('');
+        }
+
+        filesBreakdownSection.style.display = 'block';
+      } else {
+        filesBreakdownSection.style.display = 'none';
+      }
+
+      // Close collapsibles on new result
+      neutralToggle.classList.remove('open');
+      neutralToggle.setAttribute('aria-expanded', 'false');
+      neutralBody.classList.remove('open');
+      rawToggle.classList.remove('open');
+      rawToggle.setAttribute('aria-expanded', 'false');
+      rawBody.classList.remove('open');
+      filesBreakdownToggle.classList.remove('open');
+      filesBreakdownToggle.setAttribute('aria-expanded', 'false');
+      filesBreakdownBody.classList.remove('open');
+
+      resultsSection.classList.add('visible', 'animate-in');
+    }
+
+    /* =====================================================================
+       Collapsibles
+    ===================================================================== */
+    neutralToggle.addEventListener('click', () => {
+      const open = neutralToggle.classList.toggle('open');
+      neutralToggle.setAttribute('aria-expanded', String(open));
+      neutralBody.classList.toggle('open', open);
+    });
+
+    rawToggle.addEventListener('click', () => {
+      const open = rawToggle.classList.toggle('open');
+      rawToggle.setAttribute('aria-expanded', String(open));
+      rawBody.classList.toggle('open', open);
+    });
+
+    filesBreakdownToggle.addEventListener('click', () => {
+      const open = filesBreakdownToggle.classList.toggle('open');
+      filesBreakdownToggle.setAttribute('aria-expanded', String(open));
+      filesBreakdownBody.classList.toggle('open', open);
+    });
+
+    /* =====================================================================
+       Reset
+    ===================================================================== */
+    resetBtn.addEventListener('click', () => {
+      clearFiles();
+      hideError();
+      globalSummarySection.style.display = 'none';
+      filesBreakdownSection.style.display = 'none';
+      resultsSection.classList.remove('visible', 'animate-in');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+
+    /* =====================================================================
+       Analyze
+    ===================================================================== */
+    analyzeBtn.addEventListener('click', async () => {
+      if (!selectedFiles.length) return;
+      hideError();
+      analyzeBtn.disabled = true;
+      startLoader();
+
+      const formData = new FormData();
+      const endpoint = selectedFiles.length > 1 ? '/analyze-batch' : '/analyze';
+      if (selectedFiles.length > 1) {
+        selectedFiles.forEach((file) => formData.append('files', file));
+      } else {
+        formData.append('file', selectedFiles[0]);
+      }
+
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          body: formData,
+        });
+
+        stopLoader();
+
+        if (!response.ok) {
+          let detail = `Server error (${response.status})`;
+          try {
+            const err = await response.json();
+            detail = err.detail || detail;
+          } catch (_) { }
+          showError(detail);
+          analyzeBtn.disabled = false;
+          return;
+        }
+
+        const data = await response.json();
+        showResults(data);
+
+      } catch (err) {
+        stopLoader();
+        showError('Network error — make sure the API server is running.');
+        analyzeBtn.disabled = false;
+      }
+
+      analyzeBtn.disabled = false;
+    });
+  </script>
+
+</body>
+
+</html>
