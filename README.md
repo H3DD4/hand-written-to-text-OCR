@@ -135,7 +135,61 @@ Upload a file and receive extracted text + sentiment buckets.
 
 ---
 
+## Advanced architecture (what makes this pipeline non-classical)
+
+This project goes beyond “OCR → one sentiment model”. It implements a **hybrid OCR layer**, then a **two-agent parallel extraction**, then a **scoring comparator** with an optional **validator layer**.
+
+### 1) Hybrid OCR: PDF native text vs scanned raster → multi-pass preprocessing
+- **PDFs**: uses **PyMuPDF (`fitz`)** to detect and extract the **native text layer** (`page.get_text("text")`).
+- **Scanned PDFs**: converts pages to images using **pdf2image** (Poppler dependency), then runs OCR page-by-page.
+- **Images**: operates on uploaded **binary bytes** decoded in-memory via **Pillow**, then processed with **OpenCV**.
+
+#### Multi-pass OCR + OCR quality scoring
+For images, the pipeline runs multiple OpenCV preprocessing strategies:
+- grayscale
+- deskew via **Canny + HoughLinesP**
+- denoise via **fastNlMeansDenoising** (median blur fallback)
+- binarize via **Otsu** or **adaptive Gaussian threshold**
+- optional 2× **bicubic upscale**
+- **CLAHE** contrast enhancement
+- plus an additional **inverted binarization** pass for dark-background documents
+
+It computes an **`ocr_confidence`** using **word-level agreement** across passes (confirmed ≥3-char tokens) and also emits **`suspicious_words`** (tokens present in only one pass). This score is injected into the LLM prompt as a quality note.
+
+### 2) Parallel “agents”: Mistral + Gemini run concurrently
+The extraction stage is implemented as two independent LLM hypotheses executed in parallel using **`asyncio.gather()`**:
+- **Mistral agent**
+- **Gemini agent**
+
+Both agents are forced to be **exhaustive** and output **JSON only** containing:
+- `positive`: verbiatim-or-close points extracted from OCR text
+- `negative`: verbiatim-or-close points extracted from OCR text
+
+### 3) Deterministic scoring comparator (SequenceMatcher fuzzy agreement)
+Instead of trusting one model, the repo runs a **pure-Python comparator** on the two lists:
+- Similarity computed with **`difflib.SequenceMatcher`** on normalized text.
+- Points are bucketed into **AGREED** vs **DISPUTED** using explicit thresholds.
+- A global **`agreement_rate`** is computed.
+
+### 4) Validation layer: judge-by-structured-diff (only when needed)
+If `agreement_rate` is below the acceptance threshold, the system calls a **validator LLM**.
+
+Crucially, the validator is not given raw two blobs. It receives:
+- the original OCR text
+- and a **structured comparison report** enumerating AGREED and DISPUTED points (with confidence + source)
+
+This “structured diff” strategy makes the validator behave like a constrained judge that keeps what both agreed on and verifies what only one flagged.
+
+### 5) Local vs cloud operation
+- **Local**: OCR (PaddleOCR + OpenCV + Tesseract fallback) and **HuggingFace** sentiment fallback.
+- **Cloud**: extraction/validation via provider keys (**Mistral/Gemini/OpenRouter**) using an OpenAI-compatible async client.
+
+> Note: the repo does not implement offset-based “extract specific bytes” forensic carving; it uses byte-level in-memory handling and semantic extraction (PDF text layer via PyMuPDF; scanned PDFs via rasterization; images via decoding + preprocessing).
+
+---
+
 ## OCR Preprocessing Pipeline
+
 
 Applied to every image before OCR (in order):
 
